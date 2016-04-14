@@ -16,6 +16,19 @@
 
 package br.com.ingenieux.jenkins.plugins.awsebdeployment;
 
+import static org.apache.commons.lang.StringUtils.defaultString;
+import static org.apache.commons.lang.StringUtils.isNotBlank;
+
+import java.lang.reflect.InvocationTargetException;
+import java.net.URI;
+import java.util.Collections;
+import java.util.List;
+
+import javax.security.auth.login.CredentialNotFoundException;
+
+import org.apache.commons.lang.reflect.ConstructorUtils;
+import org.apache.commons.lang.reflect.FieldUtils;
+
 import com.amazonaws.AmazonWebServiceClient;
 import com.amazonaws.ClientConfiguration;
 import com.amazonaws.auth.AWSCredentialsProvider;
@@ -30,21 +43,9 @@ import com.cloudbees.plugins.credentials.CredentialsMatchers;
 import com.cloudbees.plugins.credentials.CredentialsProvider;
 import com.cloudbees.plugins.credentials.domains.DomainRequirement;
 
-import org.apache.commons.lang.reflect.ConstructorUtils;
-import org.apache.commons.lang.reflect.FieldUtils;
-
-import java.lang.reflect.InvocationTargetException;
-import java.net.URI;
-import java.util.Collections;
-import java.util.List;
-
-import javax.security.auth.login.CredentialNotFoundException;
-
+import hudson.ProxyConfiguration;
 import hudson.security.ACL;
 import jenkins.model.Jenkins;
-
-import static org.apache.commons.lang.StringUtils.defaultString;
-import static org.apache.commons.lang.StringUtils.isNotBlank;
 
 public class AWSClientFactory implements Constants {
 
@@ -72,14 +73,25 @@ public class AWSClientFactory implements Constants {
     }
 
     ClientConfiguration clientConfig = new ClientConfiguration();
-
+    
+    Jenkins jenkins = Jenkins.getInstance();
+    if (jenkins != null && jenkins.proxy != null) {
+       ProxyConfiguration proxyConfig = jenkins.proxy;
+       clientConfig.setProxyHost(proxyConfig.name);
+       clientConfig.setProxyPort(proxyConfig.port);
+       if (proxyConfig.getUserName() != null) {
+          clientConfig.setProxyUsername(proxyConfig.getUserName());
+          clientConfig.setProxyPassword(proxyConfig.getPassword());
+       }
+    }
     clientConfig.setUserAgent("ingenieux CloudButler/" + Utils.getVersion());
-
     return new AWSClientFactory(credentials, clientConfig, awsRegion);
   }
 
-  public static AWSClientFactory getClientFactory(String credentialsId, String awsRegion)
-      throws CredentialNotFoundException {
+  public static AWSClientFactory getClientFactory(
+     String credentialsId,
+     String awsRegion)
+     throws CredentialNotFoundException {
     AmazonWebServicesCredentials cred = null;
 
     if (isNotBlank(credentialsId)) {
